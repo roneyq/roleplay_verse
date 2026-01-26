@@ -1,0 +1,20 @@
+{
+    "nome": "Marcus",
+    "arquetipo": "Detetive Corrupto",
+    "tracos_personalidade": [
+        "cínico",
+        "observador",
+        "viciado em café"
+    ],
+    "valores_inagociaveis": [
+        "Sobreviver a qualquer custo",
+        "Proteger informantes"
+    ],
+    "objetivo_atual": "Achar quem matou seu parceiro",
+    "estilo_fala": [
+        ""
+    ],
+    "nivel_maleabilidade": "Baixo (Teimoso)",
+    "segredo_obscuro": "Ele recebe propina da máfia.",
+    "lore": ""
+}
