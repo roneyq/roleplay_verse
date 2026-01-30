@@ -1,24 +1,47 @@
 import os
 import json
-from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from dotenv import load_dotenv
 
-# Importação de memória compatível com LangChain 1.x
-'''try:
+# --- SISTEMA HÍBRIDO DE IMPORTAÇÃO (PC vs NUVEM) ---
+
+# 1. TENTATIVA: VectorStoreRetrieverMemory
+try:
+    # Tenta o padrão oficial (Para Nuvem)
     from langchain.memory import VectorStoreRetrieverMemory
 except ImportError:
-    from langchain_community.memory import VectorStoreRetrieverMemory'''
-from langchain_community.memory import VectorStoreRetrieverMemory
+    try:
+        # Tenta o padrão comunitário (Backup Nuvem)
+        from langchain_community.memory import VectorStoreRetrieverMemory
+    except ImportError:
+        # Tenta o seu padrão local (Para seu PC - Versão 1.2.7)
+        try:
+            from langchain_classic.memory import VectorStoreRetrieverMemory
+        except ImportError:
+            # Fallback final: Se tudo falhar, usa uma memória simples para não travar
+            from langchain.memory import ConversationBufferMemory as VectorStoreRetrieverMemory
 
-from langchain_core.prompts import PromptTemplate
-from langchain_classic.chains import ConversationChain
+# 2. TENTATIVA: ConversationChain
+try:
+    # Tenta o oficial (Para Nuvem)
+    from langchain.chains import ConversationChain
+except ImportError:
+    # Tenta o seu local (Para seu PC)
+    from langchain_classic.chains import ConversationChain
 
-# Inicialização Global
-load_dotenv()
+# 3. TENTATIVA: Prompts
+try:
+    from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate, MessagesPlaceholder
+except ImportError:
+    try:
+        from langchain.prompts import PromptTemplate, ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate, MessagesPlaceholder
+    except ImportError:
+        # Versão muito antiga local
+        from langchain_classic.prompts import PromptTemplate
 
-# Inicialização Global
+# Inicializa variáveis
 load_dotenv()
 
 # --- DIAGNÓSTICO (Adicione isto) ---
