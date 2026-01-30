@@ -1,5 +1,6 @@
 streamlit
 langchain
+langchain_community
 langchain-groq
 langchain-huggingface
 langchain-chroma
