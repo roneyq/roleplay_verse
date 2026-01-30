@@ -1,9 +1,10 @@
 streamlit
-langchain
-langchain-community
+langchain==0.2.6
+langchain-community==0.2.6
+langchain-core==0.2.10
 langchain-groq
 langchain-huggingface
 langchain-chroma
 python-dotenv
-chromadb
+chromadb==0.5.0
 pysqlite3-binary

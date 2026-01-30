@@ -6,10 +6,11 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
 # Importação de memória compatível com LangChain 1.x
-try:
+'''try:
     from langchain.memory import VectorStoreRetrieverMemory
 except ImportError:
-    from langchain_community.memory import VectorStoreRetrieverMemory
+    from langchain_community.memory import VectorStoreRetrieverMemory'''
+from langchain_community.memory import VectorStoreRetrieverMemory
 
 from langchain_core.prompts import PromptTemplate
 from langchain_classic.chains import ConversationChain
