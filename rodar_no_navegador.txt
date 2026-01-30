@@ -1,3 +1,9 @@
 # Copiar o código abaixo e colar no terminal, vai abrir o app atual no navegador para testar as funcionalidade.
 
 copie o código a seguir: streamlit run app.py
+
+
+# Comando para enviar para o github e atualizar no streamlit cloud
+git add .
+git commit -m "Feature: Adiciona RAG com PDF"
+git push
