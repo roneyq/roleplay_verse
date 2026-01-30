@@ -19,9 +19,10 @@ from brain import (
     listar_personagens,
     carregar_personagem,
     criar_personagem_avancado,
-    carregar_mensagens_salvas,  # <--- Nova
-    salvar_mensagem_no_historico,  # <--- Nova
-    limpar_historico_visual  # <--- Nova
+    carregar_mensagens_salvas,
+    salvar_mensagem_no_historico,
+    limpar_historico_visual,
+    processar_conhecimento_mundo
 )
 
 # --- CONFIGURAÇÃO VISUAL ---
@@ -69,16 +70,21 @@ def get_avatar(nome, arquetipo):
 
 # --- MENU PRINCIPAL (SIDEBAR) ---
 with st.sidebar:
-    st.title("📱 Menu Principal")
+    st.title("🎲 Universo RPG")
 
-    # Navegação Principal
-    menu_escolha = st.radio(
-        "Ir para:",
-        ["💬 Minhas Conversas", "➕ Criar Personagem", "⚙️ Configurações"],
-        index=0
-    )
+    # --- NOVO: UPLOAD DE MUNDO ---
+    with st.expander("📚 Injetar Conhecimento (PDF)"):
+        arquivo_pdf = st.file_uploader("Subir Lore/Regras", type="pdf")
+        if arquivo_pdf is not None:
+            with st.spinner("Lendo livro..."):
+                # Precisamos importar a função nova do brain
+                from brain import processar_conhecimento_mundo
+
+                msg = processar_conhecimento_mundo(arquivo_pdf)
+                st.success(msg)
 
     st.markdown("---")
+    # ... o resto do código de seleção de personagem continua igual ...
 
 # --- LÓGICA: CRIAR PERSONAGEM ---
 if menu_escolha == "➕ Criar Personagem":

@@ -1,212 +1,179 @@
 import os
-import json
+import tempfile
 from langchain_groq import ChatGroq
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader
 from dotenv import load_dotenv
 
 # --- SISTEMA HÍBRIDO DE IMPORTAÇÃO (PC vs NUVEM) ---
-
-# 1. TENTATIVA: VectorStoreRetrieverMemory
 try:
-    # Tenta o padrão oficial (Para Nuvem)
-    from langchain.memory import VectorStoreRetrieverMemory
+    from langchain_classic.memory import VectorStoreRetrieverMemory
 except ImportError:
     try:
-        # Tenta o padrão comunitário (Backup Nuvem)
+        from langchain.memory import VectorStoreRetrieverMemory
+    except ImportError:
         from langchain_community.memory import VectorStoreRetrieverMemory
-    except ImportError:
-        # Tenta o seu padrão local (Para seu PC - Versão 1.2.7)
-        try:
-            from langchain_classic.memory import VectorStoreRetrieverMemory
-        except ImportError:
-            # Fallback final: Se tudo falhar, usa uma memória simples para não travar
-            from langchain.memory import ConversationBufferMemory as VectorStoreRetrieverMemory
 
-# 2. TENTATIVA: ConversationChain
 try:
-    # Tenta o oficial (Para Nuvem)
-    from langchain.chains import ConversationChain
-except ImportError:
-    # Tenta o seu local (Para seu PC)
     from langchain_classic.chains import ConversationChain
-
-# 3. TENTATIVA: Prompts
-try:
-    from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate, MessagesPlaceholder
 except ImportError:
-    try:
-        from langchain.prompts import PromptTemplate, ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate, MessagesPlaceholder
-    except ImportError:
-        # Versão muito antiga local
-        from langchain_classic.prompts import PromptTemplate
+    from langchain.chains import ConversationChain
 
-# Inicializa variáveis
+try:
+    from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, SystemMessagePromptTemplate, \
+        HumanMessagePromptTemplate, MessagesPlaceholder
+except ImportError:
+    from langchain.prompts import PromptTemplate, ChatPromptTemplate, SystemMessagePromptTemplate, \
+        HumanMessagePromptTemplate, MessagesPlaceholder
+
 load_dotenv()
 
-# --- DIAGNÓSTICO (Adicione isto) ---
-api_key = os.getenv("GROQ_API_KEY")
-if not api_key:
-    print("❌ ERRO CRÍTICO: Chave API não encontrada! Verifique o arquivo .env")
-elif api_key.startswith("gsk_"):
-    print(f"✅ Chave carregada: {api_key[:4]}...{api_key[-4:]}")
-else:
-    print("⚠️ AVISO: A chave não parece ser uma chave Groq válida (deve começar com gsk_)")
-# -----------------------------------
-
-# Carregamos o modelo de Embeddings UMA VEZ só (para economizar tempo)
-print("Carregando modelo de Embeddings...")
+# --- CONFIGURAÇÕES GLOBAIS ---
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 
-def carregar_personagem(nome_arquivo):
-    """Lê o JSON do personagem selecionado"""
-    caminho = os.path.join("personagens", nome_arquivo)
-    with open(caminho, 'r', encoding='utf-8') as f:
+def carregar_personagem(arquivo):
+    import json
+    with open(f"personagens/{arquivo}", "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def listar_personagens():
-    """Devolve uma lista com os nomes dos arquivos .json na pasta"""
     if not os.path.exists("personagens"):
         os.makedirs("personagens")
-    arquivos = [f for f in os.listdir("personagens") if f.endswith(".json")]
-    return arquivos
+        # Cria um personagem padrão se não existir
+        padrao = {
+            "nome": "Aria", "arquetipo": "Ladra", "tracos_personalidade": ["Cinica"],
+            "objetivo_atual": "Sobreviver", "estilo_fala": ["Girias"],
+            "valores_inagociaveis": ["Nao trair"], "nivel_maleabilidade": "Baixo",
+            "segredo_obscuro": "Roubou o pai", "lore": "Uma ladra das ruas."
+        }
+        with open("personagens/Aria.json", "w", encoding="utf-8") as f:
+            json.dump(padrao, f)
+    return [f for f in os.listdir("personagens") if f.endswith(".json")]
 
 
 def criar_personagem_avancado(nome, arquetipo, tracos, valores, objetivo, estilo, maleabilidade, segredo, historia):
-    """Cria um JSON com a estrutura psicológica avançada"""
-
-    # Transforma strings separadas por vírgula em listas
-    lista_tracos = [t.strip() for t in tracos.split(',')]
-    lista_valores = [v.strip() for v in valores.split(',')]
-    lista_estilo = [e.strip() for e in estilo.split(',')]
-
+    import json
     dados = {
         "nome": nome,
         "arquetipo": arquetipo,
-        "tracos_personalidade": lista_tracos,
-        "valores_inagociaveis": lista_valores,
+        "tracos_personalidade": [t.strip() for t in tracos.split(',')],
+        "valores_inagociaveis": [v.strip() for v in valores.split(',')],
         "objetivo_atual": objetivo,
-        "estilo_fala": lista_estilo,
+        "estilo_fala": [e.strip() for e in estilo.split(',')],
         "nivel_maleabilidade": maleabilidade,
         "segredo_obscuro": segredo,
         "lore": historia
     }
-
-    # Sanitiza nome do arquivo
-    nome_arquivo = "".join([c for c in nome if c.isalpha() or c.isdigit() or c == ' ']).rstrip() + ".json"
-
-    if not os.path.exists("personagens"):
-        os.makedirs("personagens")
-
-    caminho = os.path.join("personagens", nome_arquivo)
-    with open(caminho, 'w', encoding='utf-8') as f:
+    with open(f"personagens/{nome}.json", "w", encoding="utf-8") as f:
         json.dump(dados, f, ensure_ascii=False, indent=4)
-    return nome_arquivo
 
 
-# No topo do arquivo, adicione estas importações novas:
-from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate, \
-    MessagesPlaceholder
+# --- FUNÇÕES DE HISTÓRICO VISUAL (WHATSAPP) ---
+def carregar_mensagens_salvas(nome_arquivo):
+    import json
+    if not os.path.exists("historicos"): os.makedirs("historicos")
+    caminho = f"historicos/{nome_arquivo.replace('.json', '_chat.json')}"
+    if os.path.exists(caminho):
+        with open(caminho, "r", encoding="utf-8") as f: return json.load(f)
+    return []
 
 
-# ... (o resto das funções carregar/criar continua igual) ...
+def salvar_mensagem_no_historico(nome_arquivo, role, content):
+    import json
+    msgs = carregar_mensagens_salvas(nome_arquivo)
+    msgs.append({"role": role, "content": content})
+    caminho = f"historicos/{nome_arquivo.replace('.json', '_chat.json')}"
+    with open(caminho, "w", encoding="utf-8") as f:
+        json.dump(msgs, f, ensure_ascii=False, indent=4)
 
-def responder_usuario(texto, dados_personagem, nome_arquivo_personagem):
-    # 1. Define pasta de memória
+
+def limpar_historico_visual(nome_arquivo):
+    caminho = f"historicos/{nome_arquivo.replace('.json', '_chat.json')}"
+    if os.path.exists(caminho): os.remove(caminho)
+
+
+# --- NOVA FUNÇÃO: PROCESSAR O PDF DO MUNDO ---
+def processar_conhecimento_mundo(arquivo_pdf_bytes):
+    """Lê um PDF e salva no banco vetorial de 'Conhecimento Geral'"""
+    # 1. Salva o PDF temporariamente para o Loader ler
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        tmp_file.write(arquivo_pdf_bytes.read())
+        tmp_path = tmp_file.name
+
+    # 2. Carrega e fatia o PDF
+    loader = PyPDFLoader(tmp_path)
+    docs = loader.load()
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    chunks = splitter.split_documents(docs)
+
+    # 3. Salva na pasta 'memoria_mundo' (separado da conversa)
+    pasta_mundo = "./memorias/mundo_conhecimento"
+    vectorstore = Chroma.from_documents(
+        documents=chunks,
+        embedding=embeddings,
+        persist_directory=pasta_mundo
+    )
+
+    # Limpa arquivo temporário
+    os.remove(tmp_path)
+    return f"Conhecimento absorvido! {len(chunks)} fragmentos lidos."
+
+
+# --- CÉREBRO PRINCIPAL (COM RAG) ---
+def responder_usuario(texto_usuario, dados_personagem, nome_arquivo_personagem):
+    # 1. Configura Memória de Conversa (Quem eu sou + O que falamos)
     nome_limpo = nome_arquivo_personagem.replace('.json', '')
     pasta_memoria = f"./memorias/memoria_{nome_limpo}"
 
-    # 2. Conecta ao banco (Chroma)
-    vectorstore = Chroma(persist_directory=pasta_memoria, embedding_function=embeddings)
+    # 2. Configura Memória de Mundo (O que eu sei dos livros)
+    pasta_mundo = "./memorias/mundo_conhecimento"
+    contexto_extra = ""
 
-    # AJUSTE: Buscamos apenas 1 ou 2 memórias passadas para não poluir
-    retriever = vectorstore.as_retriever(search_kwargs=dict(k=2))
+    # Se existe conhecimento de mundo, busca informações relevantes
+    if os.path.exists(pasta_mundo) and os.listdir(pasta_mundo):
+        try:
+            db_mundo = Chroma(persist_directory=pasta_mundo, embedding_function=embeddings)
+            # Busca os 2 trechos mais parecidos com a pergunta do usuário
+            docs = db_mundo.similarity_search(texto_usuario, k=2)
+            contexto_extra = "\n".join([doc.page_content for doc in docs])
+        except Exception as e:
+            print(f"Erro ao ler mundo: {e}")
+
+    # 3. Prepara a memória da conversa
+    vectorstore = Chroma(persist_directory=pasta_memoria, embedding_function=embeddings)
+    retriever = vectorstore.as_retriever(search_kwargs=dict(k=3))
     memory = VectorStoreRetrieverMemory(retriever=retriever)
 
-    # 3. Prompt Blindado (ChatPromptTemplate)
-    # Aqui separamos explicitamente o "Sistema" do "Humano"
-
+    # 4. Prompt Turbinado (Identidade + Mundo + Conversa)
     texto_sistema = f"""
-    VOCÊ ESTÁ INCORPORANDO: {dados_personagem['nome']}
-    ---
-    ARQUÉTIPO: {dados_personagem.get('arquetipo', 'Indefinido')}
+    VOCÊ É: {dados_personagem['nome']}
+    ARQUÉTIPO: {dados_personagem.get('arquetipo', 'Desconhecido')}
     PERSONALIDADE: {", ".join(dados_personagem.get('tracos_personalidade', []))}
     OBJETIVO: {dados_personagem.get('objetivo_atual', 'Nenhum')}
-    ESTILO DE FALA: {", ".join(dados_personagem.get('estilo_fala', []))}
-    VALORES: {", ".join(dados_personagem.get('valores_inagociaveis', []))}
-    MALEABILIDADE: {dados_personagem.get('nivel_maleabilidade', 'Médio')}
-    SEGREDO: {dados_personagem.get('segredo_obscuro', '')}
-    LORE: {dados_personagem.get('lore', '')}
-    ---
 
-    INSTRUÇÕES DE PENSAMENTO (Oculto):
-    1. Antes de responder, gere um pensamento interno na tag [PENSAMENTO].
-    2. Avalie a intenção do usuário e se ela fere seus valores.
-    3. Depois, gere sua resposta na tag [FALA].
-    4. JAMAIS saia do personagem.
+    📚 CONHECIMENTO DO MUNDO (Use isso para responder perguntas sobre lore/história):
+    {contexto_extra}
 
-    LEMBRANÇAS RELEVANTES DO PASSADO:
+    ⚠️ INSTRUÇÕES:
+    1. Responda como o personagem.
+    2. Se a informação estiver no 'CONHECIMENTO DO MUNDO', use-a.
+    3. Pense antes de responder na tag [PENSAMENTO].
+    4. Responda na tag [FALA].
+
+    HISTÓRICO DA CONVERSA:
     {{history}}
     """
 
-    # Montagem do Chat
     prompt_template = ChatPromptTemplate.from_messages([
         SystemMessagePromptTemplate.from_template(texto_sistema),
         HumanMessagePromptTemplate.from_template("{input}")
     ])
 
-    # 4. LLM Llama 3.1
-    llm = ChatGroq(
-        model_name="llama-3.1-8b-instant",
-        temperature=0.6,  # Diminuí um pouco a temperatura para ele alucinar menos
-        groq_api_key=os.getenv("GROQ_API_KEY")
-    )
+    llm = ChatGroq(model_name="llama-3.1-8b-instant", temperature=0.7)
 
-    # 5. Gera resposta
     chain = ConversationChain(llm=llm, prompt=prompt_template, memory=memory)
-    return chain.predict(input=texto)
-
-
-    PROMPT = PromptTemplate(input_variables=["history", "input"], template=template)
-
-
-# --- NOVAS FUNÇÕES: GERENCIAMENTO DE HISTÓRICO VISUAL (WHATSAPP STYLE) ---
-
-def carregar_mensagens_salvas(nome_arquivo_personagem):
-    """Lê o histórico de chat (JSON) para a interface"""
-    # Cria pasta se não existir
-    if not os.path.exists("historicos"):
-        os.makedirs("historicos")
-
-    nome_chat = nome_arquivo_personagem.replace(".json", "_chat.json")
-    caminho = os.path.join("historicos", nome_chat)
-
-    if os.path.exists(caminho):
-        with open(caminho, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []  # Retorna lista vazia se não houver histórico
-
-
-def salvar_mensagem_no_historico(nome_arquivo_personagem, role, content):
-    """Salva uma nova mensagem no arquivo JSON de histórico"""
-    mensagens = carregar_mensagens_salvas(nome_arquivo_personagem)
-
-    # Adiciona a nova mensagem com timestamp (opcional, mas bom para o futuro)
-    mensagens.append({"role": role, "content": content})
-
-    nome_chat = nome_arquivo_personagem.replace(".json", "_chat.json")
-    caminho = os.path.join("historicos", nome_chat)
-
-    with open(caminho, "w", encoding="utf-8") as f:
-        json.dump(mensagens, f, ensure_ascii=False, indent=4)
-
-
-def limpar_historico_visual(nome_arquivo_personagem):
-    """Apaga apenas o histórico visual, mantendo a memória da IA"""
-    nome_chat = nome_arquivo_personagem.replace(".json", "_chat.json")
-    caminho = os.path.join("historicos", nome_chat)
-    if os.path.exists(caminho):
-        os.remove(caminho)
-
+    return chain.predict(input=texto_usuario)
