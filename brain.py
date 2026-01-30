@@ -2,20 +2,59 @@ import os
 import json
 import hashlib
 import tempfile
-from langchain_groq import ChatGroq
-from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader
-from langchain.memory import ConversationBufferMemory  # Fallback simples e robusto
-from langchain.chains import ConversationChain
-from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
+
+# --- SISTEMA HÍBRIDO DE IMPORTAÇÃO (PC vs NUVEM) ---
+# Resgatando nossa solução de compatibilidade
+try:
+    from langchain_groq import ChatGroq
+    from langchain_chroma import Chroma
+    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    from langchain_community.document_loaders import PyPDFLoader
+except ImportError:
+    # Fallback para ambientes antigos ou customizados
+    from langchain_classic.chat_models import ChatGroq
+    from langchain_classic.embeddings import HuggingFaceEmbeddings
+    from langchain_classic.vectorstores import Chroma
+
+# --- IMPORTAÇÃO DE MEMÓRIA (A Parte Crítica) ---
+try:
+    # Tenta o oficial (Nuvem)
+    from langchain.memory import ConversationBufferMemory
+except ImportError:
+    try:
+        # Tenta a comunidade
+        from langchain_community.memory import ConversationBufferMemory
+    except ImportError:
+        try:
+            # Tenta o seu local (PC Roney)
+            from langchain_classic.memory import ConversationBufferMemory
+        except ImportError:
+            # Último recurso
+            from langchain.chains.conversation.memory import ConversationBufferMemory
+
+# --- IMPORTAÇÃO DE CHAINS E PROMPTS ---
+try:
+    from langchain.chains import ConversationChain
+    from langchain.prompts import PromptTemplate
+except ImportError:
+    try:
+        from langchain_classic.chains import ConversationChain
+        from langchain_classic.prompts import PromptTemplate
+    except ImportError:
+        from langchain.chains import ConversationChain
+        from langchain_core.prompts import PromptTemplate
 
 load_dotenv()
 
 # --- CONFIGURAÇÕES GLOBAIS ---
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+# Tenta instanciar os embeddings com tratamento de erro
+try:
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+except Exception:
+    # Fallback genérico se der erro no modelo
+    embeddings = None
 
 
 # --- SISTEMA DE USUÁRIOS E SEGURANÇA ---
@@ -62,7 +101,12 @@ def criar_novo_usuario(usuario, senha):
 
 
 # --- GERENCIAMENTO DE PERSONAGENS COM PERMISSÃO ---
-def listar_personagens(usuario_logado, is_admin):
+def listar_personagens(usuario_logado=None, is_admin=False):
+    # Se não passar usuário (modo legado), lista tudo
+    if usuario_logado is None:
+        if not os.path.exists("personagens"): return []
+        return [f for f in os.listdir("personagens") if f.endswith(".json")]
+
     if not os.path.exists("personagens"): os.makedirs("personagens")
     todos_arquivos = [f for f in os.listdir("personagens") if f.endswith(".json")]
 
@@ -72,11 +116,7 @@ def listar_personagens(usuario_logado, is_admin):
             with open(f"personagens/{arquivo}", "r", encoding="utf-8") as f:
                 dados = json.load(f)
 
-            # REGRAS DE VISIBILIDADE:
-            # 1. Admin vê tudo.
-            # 2. Personagem é Público (Global).
-            # 3. Personagem é Privado mas fui eu (usuário) que criei.
-            dono = dados.get("owner", "admin")  # Se não tiver dono, assume admin (legado)
+            dono = dados.get("owner", "admin")
             visibilidade = dados.get("visibility", "public")
 
             if is_admin:
@@ -109,7 +149,7 @@ def contar_meus_personagens(usuario_logado):
 
 
 def criar_personagem_avancado(nome, arquetipo, tracos, valores, objetivo, estilo, maleabilidade, segredo, historia,
-                              dono, visibilidade="private"):
+                              dono="admin", visibilidade="public"):
     dados = {
         "nome": nome,
         "arquetipo": arquetipo,
@@ -120,8 +160,8 @@ def criar_personagem_avancado(nome, arquetipo, tracos, valores, objetivo, estilo
         "nivel_maleabilidade": maleabilidade,
         "segredo_obscuro": segredo,
         "lore": historia,
-        "owner": dono,  # NOVO: Quem criou
-        "visibility": visibilidade  # NOVO: public (todos) ou private (só dono)
+        "owner": dono,
+        "visibility": visibilidade
     }
 
     if not os.path.exists("personagens"): os.makedirs("personagens")
@@ -129,12 +169,12 @@ def criar_personagem_avancado(nome, arquetipo, tracos, valores, objetivo, estilo
         json.dump(dados, f, ensure_ascii=False, indent=4)
 
 
-# --- HISTÓRICO ISOLADO POR USUÁRIO ---
-def carregar_mensagens_salvas(nome_personagem_arquivo, usuario_logado):
-    # O arquivo de histórico agora tem o NOME DO USUÁRIO no nome
-    # Ex: Aria_admin_chat.json ou Aria_jogador1_chat.json
+# --- HISTÓRICO E RAG ---
+def carregar_mensagens_salvas(nome_personagem_arquivo, usuario_logado=None):
     nome_limpo = nome_personagem_arquivo.replace('.json', '')
-    arquivo_hist = f"historicos/{nome_limpo}_{usuario_logado}_chat.json"
+    # Se não tiver usuário logado (retrocompatibilidade), usa o nome do arquivo simples
+    sufixo = f"_{usuario_logado}" if usuario_logado else ""
+    arquivo_hist = f"historicos/{nome_limpo}{sufixo}_chat.json"
 
     if not os.path.exists("historicos"): os.makedirs("historicos")
 
@@ -143,24 +183,26 @@ def carregar_mensagens_salvas(nome_personagem_arquivo, usuario_logado):
     return []
 
 
-def salvar_mensagem_no_historico(nome_personagem_arquivo, usuario_logado, role, content):
+def salvar_mensagem_no_historico(nome_personagem_arquivo, role, content, usuario_logado=None):
+    # Nota: Ajustei a ordem dos argumentos para facilitar a chamada antiga se precisar
     msgs = carregar_mensagens_salvas(nome_personagem_arquivo, usuario_logado)
     msgs.append({"role": role, "content": content})
 
     nome_limpo = nome_personagem_arquivo.replace('.json', '')
-    arquivo_hist = f"historicos/{nome_limpo}_{usuario_logado}_chat.json"
+    sufixo = f"_{usuario_logado}" if usuario_logado else ""
+    arquivo_hist = f"historicos/{nome_limpo}{sufixo}_chat.json"
 
     with open(arquivo_hist, "w", encoding="utf-8") as f:
         json.dump(msgs, f, ensure_ascii=False, indent=4)
 
 
-def limpar_historico_visual(nome_personagem_arquivo, usuario_logado):
+def limpar_historico_visual(nome_personagem_arquivo, usuario_logado=None):
     nome_limpo = nome_personagem_arquivo.replace('.json', '')
-    arquivo_hist = f"historicos/{nome_limpo}_{usuario_logado}_chat.json"
+    sufixo = f"_{usuario_logado}" if usuario_logado else ""
+    arquivo_hist = f"historicos/{nome_limpo}{sufixo}_chat.json"
     if os.path.exists(arquivo_hist): os.remove(arquivo_hist)
 
 
-# --- RAG / PDF (Mantido Igual) ---
 def processar_conhecimento_mundo(arquivo_pdf_bytes):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
         tmp_file.write(arquivo_pdf_bytes.read())
@@ -178,11 +220,7 @@ def processar_conhecimento_mundo(arquivo_pdf_bytes):
 
 
 # --- CÉREBRO LLM ---
-def responder_usuario(texto_usuario, dados_personagem, nome_arquivo_personagem, usuario_logado):
-    # Memória Específica do Usuário + Personagem
-    nome_limpo = nome_arquivo_personagem.replace('.json', '')
-    pasta_memoria = f"./memorias/memoria_{nome_limpo}_{usuario_logado}"  # Pasta única para cada user
-
+def responder_usuario(texto_usuario, dados_personagem, nome_arquivo_personagem, usuario_logado=None):
     # RAG de Mundo
     pasta_mundo = "./memorias/mundo_conhecimento"
     contexto_extra = ""
@@ -194,9 +232,8 @@ def responder_usuario(texto_usuario, dados_personagem, nome_arquivo_personagem, 
         except:
             pass
 
-    # Memória Conversacional (Simples para garantir funcionamento)
+    # Memória Conversacional
     memory = ConversationBufferMemory()
-    # (Nota: Em produção, usaríamos VectorStoreMemory persistente, mas buffer é mais seguro para testes rápidos)
 
     texto_sistema = f"""
     VOCÊ É: {dados_personagem['nome']}
