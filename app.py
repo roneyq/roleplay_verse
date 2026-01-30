@@ -1,19 +1,17 @@
 import streamlit as st
 import sys
 import os
+import re
+import time
 
-# --- Hack do BD (só roda se estiver na nuvem/linux) ---
+# --- HACK DO BANCO DE DADOS (Para Nuvem) ---
 try:
     __import__('pysqlite3')
     sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 except ImportError:
-    # Se der erro (estamos no windows), apenas ignora e segue a vida
     pass
 
-
-import re
-import time
-# Importando as novas funções de histórico
+# --- IMPORTS DO CÉREBRO ---
 from brain import (
     responder_usuario,
     listar_personagens,
@@ -22,7 +20,7 @@ from brain import (
     carregar_mensagens_salvas,
     salvar_mensagem_no_historico,
     limpar_historico_visual,
-    processar_conhecimento_mundo
+    processar_conhecimento_mundo  # <--- Importante para o PDF
 )
 
 # --- CONFIGURAÇÃO VISUAL ---
@@ -33,11 +31,7 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     .stApp { background-color: #0e1117; color: #e0e0e0; }
-
-    /* Estilo de Menu */
     .stRadio > div { flex-direction: row; }
-
-    /* Bolhas de Chat estilo WhatsApp */
     .stChatMessage { gap: 1rem; }
 </style>
 """, unsafe_allow_html=True)
@@ -68,25 +62,36 @@ def get_avatar(nome, arquetipo):
     return "👤"
 
 
-# --- MENU PRINCIPAL (SIDEBAR) ---
+# --- BARRA LATERAL (MENU) ---
 with st.sidebar:
     st.title("🎲 Universo RPG")
 
-    # --- NOVO: UPLOAD DE MUNDO ---
+    # 1. MENU PRINCIPAL (CRUCIAL: TEM QUE ESTAR AQUI EM CIMA)
+    menu_escolha = st.radio(
+        "Ir para:",
+        ["💬 Minhas Conversas", "➕ Criar Personagem", "⚙️ Configurações"],
+        index=0
+    )
+
+    st.markdown("---")
+
+    # 2. ÁREA DE UPLOAD DE CONHECIMENTO (RAG)
     with st.expander("📚 Injetar Conhecimento (PDF)"):
+        st.caption("Adicione livros ou regras para a IA ler.")
         arquivo_pdf = st.file_uploader("Subir Lore/Regras", type="pdf")
         if arquivo_pdf is not None:
             with st.spinner("Lendo livro..."):
-                # Precisamos importar a função nova do brain
-                from brain import processar_conhecimento_mundo
-
-                msg = processar_conhecimento_mundo(arquivo_pdf)
-                st.success(msg)
+                try:
+                    msg = processar_conhecimento_mundo(arquivo_pdf)
+                    st.success(msg)
+                except Exception as e:
+                    st.error(f"Erro ao ler PDF: {e}")
 
     st.markdown("---")
-    # ... o resto do código de seleção de personagem continua igual ...
 
-# --- LÓGICA: CRIAR PERSONAGEM ---
+# --- LÓGICA PRINCIPAL (CONTROLADOR) ---
+
+# CASO 1: CRIAR PERSONAGEM
 if menu_escolha == "➕ Criar Personagem":
     st.header("🛠️ Criar Novo Personagem")
     with st.form("criacao"):
@@ -107,25 +112,25 @@ if menu_escolha == "➕ Criar Personagem":
             if nome and arquetipo:
                 criar_personagem_avancado(nome, arquetipo, tracos, valores, objetivo, estilo, maleabilidade, segredo,
                                           historia)
-                st.success(f"{nome} criado com sucesso!")
+                st.toast(f"{nome} criado com sucesso!", icon="✅")
                 time.sleep(1)
                 st.rerun()
 
-# --- LÓGICA: CONFIGURAÇÕES (Placeholder) ---
+# CASO 2: CONFIGURAÇÕES
 elif menu_escolha == "⚙️ Configurações":
     st.header("Configurações do Sistema")
     st.info("Funcionalidades futuras: Exportar chat, Mudar tema, Ajustar Token da API.")
 
-# --- LÓGICA: CONVERSAS (WHATSAPP STYLE) ---
+# CASO 3: CONVERSAS (CHAT)
 elif menu_escolha == "💬 Minhas Conversas":
-    # 1. Lista de Contatos
+    # Lista de Contatos
     arquivos = listar_personagens()
     opcoes_limpas = {f.replace(".json", ""): f for f in arquivos}
 
     if not arquivos:
         st.warning("Você não tem personagens. Vá em 'Criar Personagem' primeiro.")
     else:
-        # Seletor de Contato na Sidebar (para não poluir o chat)
+        # Seletor de Contato na Sidebar
         with st.sidebar:
             st.subheader("Contatos")
             contato_selecionado = st.selectbox(
@@ -133,18 +138,17 @@ elif menu_escolha == "💬 Minhas Conversas":
                 list(opcoes_limpas.keys())
             )
 
-            # Botão de Reset
             arquivo_atual = opcoes_limpas[contato_selecionado]
             if st.button("🗑️ Limpar Conversa", type="primary"):
                 limpar_historico_visual(arquivo_atual)
                 st.rerun()
 
-        # 2. Carregar Dados do Personagem e Histórico
+        # Carregar Dados
         arquivo_atual = opcoes_limpas[contato_selecionado]
         personagem_atual = carregar_personagem(arquivo_atual)
         mensagens_salvas = carregar_mensagens_salvas(arquivo_atual)
 
-        # 3. Cabeçalho do Chat
+        # Cabeçalho
         avatar_img = get_avatar(personagem_atual['nome'], personagem_atual['arquetipo'])
         st.markdown(f"""
         <div style='display: flex; align-items: center; gap: 10px; padding: 10px; background-color: #161b22; border-radius: 10px; margin-bottom: 20px;'>
@@ -156,39 +160,36 @@ elif menu_escolha == "💬 Minhas Conversas":
         </div>
         """, unsafe_allow_html=True)
 
-        # 4. Renderizar Mensagens Antigas (Persistência)
-        # Inicializa session state COM o histórico do disco
+        # Inicializa session state
         if "chat_history" not in st.session_state or st.session_state.get("current_char") != contato_selecionado:
             st.session_state.chat_history = mensagens_salvas
             st.session_state.current_char = contato_selecionado
 
+        # Renderiza Mensagens
         for msg in st.session_state.chat_history:
             icon = avatar_img if msg["role"] == "assistant" else "🧑‍💻"
             with st.chat_message(msg["role"], avatar=icon):
                 st.markdown(msg["content"])
 
-        # 5. Input e Processamento
+        # Input
         if prompt := st.chat_input(f"Mensagem para {personagem_atual['nome']}..."):
-            # Exibe e Salva User
             st.chat_message("user", avatar="🧑‍💻").markdown(prompt)
             st.session_state.chat_history.append({"role": "user", "content": prompt})
             salvar_mensagem_no_historico(arquivo_atual, "user", prompt)
 
-            # Resposta IA
             with st.chat_message("assistant", avatar=avatar_img):
-                with st.spinner("Digitando..."):
+                with st.spinner("Consultando cérebro e livros..."):
                     try:
+                        # O brain agora usa o PDF automaticamente se ele existir
                         resposta_bruta = responder_usuario(prompt, personagem_atual, arquivo_atual)
                         pensamento, fala_limpa = separar_pensamento_fala(resposta_bruta)
 
-                        # Mostra pensamento se houver
                         if pensamento:
                             with st.expander("💭 Pensamento"):
                                 st.markdown(f"*{pensamento}*")
 
                         st.markdown(fala_limpa)
 
-                        # Salva IA
                         st.session_state.chat_history.append({"role": "assistant", "content": fala_limpa})
                         salvar_mensagem_no_historico(arquivo_atual, "assistant", fala_limpa)
 
