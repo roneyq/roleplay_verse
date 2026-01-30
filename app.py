@@ -27,7 +27,7 @@ from brain import (
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Roleplay Verse", page_icon="🔮", layout="wide")
 
-# --- CSS AVANÇADO (DARK MODE PREMIUM + GALERIA) ---
+# --- CSS AVANÇADO (VISUAL APP) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -36,33 +36,39 @@ st.markdown("""
     .stApp { background-color: #000000; color: #e0e0e0; font-family: 'Inter', sans-serif; }
     #MainMenu, footer, header { visibility: hidden; }
 
-    /* BOTÕES */
-    .stButton > button {
+    /* BOTÕES GERAIS */
+    div.stButton > button {
         background: linear-gradient(90deg, #8A2387, #E94057, #F27121);
         color: white; border: none; border-radius: 25px;
         padding: 10px 24px; font-weight: 600; width: 100%;
         transition: transform 0.2s;
+        box-shadow: 0 4px 10px rgba(233, 64, 87, 0.3);
     }
-    .stButton > button:hover { transform: scale(1.02); color: white; }
+    div.stButton > button:hover { transform: scale(1.02); color: white; }
 
-    /* BOTÃO SECUNDÁRIO (Cinza/Outline) */
-    .btn-secondary {
+    /* BOTÃO DE MENU (NAVEGAÇÃO) - ESTILO ABA */
+    .nav-btn-selected > button {
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 2px solid #ffffff !important;
+    }
+    .nav-btn-unselected > button {
         background: transparent !important;
-        border: 1px solid #555 !important;
-        color: #aaa !important;
+        color: #666666 !important;
+        border: 1px solid #333 !important;
     }
 
-    /* CARD DE PERSONAGEM (FEED) */
+    /* CARDS */
     .char-card {
         background-color: #1a1a1a; border-radius: 15px; padding: 15px;
         border: 1px solid #333; margin-bottom: 20px; text-align: center;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3); position: relative;
     }
     .char-card img {
-        border-radius: 10px; width: 100%; height: 250px; object-fit: cover; margin-bottom: 10px;
+        border-radius: 10px; width: 100%; height: 200px; object-fit: cover; margin-bottom: 10px;
     }
-    .char-name { font-size: 1.2rem; font-weight: 800; color: #fff; }
-    .char-desc { font-size: 0.8rem; color: #888; height: 40px; overflow: hidden; margin-bottom: 10px;}
+    .char-name { font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 5px; }
+    .char-desc { font-size: 0.8rem; color: #888; height: 35px; overflow: hidden; margin-bottom: 10px;}
 
     /* CHAT BUBBLES */
     .bubble-user {
@@ -76,27 +82,9 @@ st.markdown("""
         align-self: flex-start; max-width: 85%; margin-bottom: 10px;
     }
 
-    /* GALERIA BLOQUEADA (EFEITO BLUR) */
-    .locked-content {
-        position: relative; overflow: hidden; border-radius: 10px; margin-bottom: 10px;
-    }
-    .locked-content img {
-        filter: blur(8px); opacity: 0.6; width: 100%; height: 150px; object-fit: cover;
-    }
-    .lock-icon {
-        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        font-size: 2rem; color: white; text-shadow: 0 2px 5px rgba(0,0,0,0.8);
-    }
-
-    /* PROGRESS BAR CUSTOM */
-    .stProgress > div > div > div > div {
-        background-image: linear-gradient(to right, #8A2387, #F27121);
-    }
-
-    /* TABS */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #0e0e0e; padding: 10px; border-radius: 20px;
-        position: sticky; top: 0; z-index: 999; justify-content: space-around;
+    /* INPUT FIXO EMBAIXO (Simulação) */
+    .stTextInput > div > div > input {
+        background-color: #1a1a1a; color: white; border: 1px solid #333; border-radius: 20px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -104,111 +92,98 @@ st.markdown("""
 
 # --- FUNÇÕES AUXILIARES ---
 def get_avatar_url(arquetipo, seed):
-    # Gera imagens diferentes baseadas no nome
     arq = arquetipo.lower()
     base = "https://api.dicebear.com/7.x/adventurer/svg"
-    if "ladra" in arq: return f"{base}?seed={seed}&backgroundColor=b6e3f4"
-    if "detetive" in arq: return f"{base}?seed={seed}&backgroundColor=c0aede"
-    return f"{base}?seed={seed}"
+    bg = "b6e3f4"
+    if "detetive" in arq: bg = "c0aede"
+    if "mago" in arq: bg = "ffdfbf"
+    return f"{base}?seed={seed}&backgroundColor={bg}"
 
 
-def render_galeria_simulada():
-    # Simula conteúdo para monetização futura
-    st.markdown("#### 📸 Galeria & Mídia")
-    c1, c2, c3 = st.columns(3)
-
-    # Foto 1: Desbloqueada
-    with c1:
-        st.image("https://placehold.co/200x200/2a0845/FFF?text=Desbloqueado", use_container_width=True)
-        st.caption("📷 Selfie Matinal")
-
-    # Foto 2: Bloqueada (Premium)
-    with c2:
-        st.markdown("""
-        <div class="locked-content">
-            <img src="https://placehold.co/200x200/333/666?text=Private">
-            <div class="lock-icon">🔒</div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.caption("💎 Exclusivo (Premium)")
-
-    # Foto 3: Bloqueada (Nível)
-    with c3:
-        st.markdown("""
-        <div class="locked-content">
-            <img src="https://placehold.co/200x200/333/666?text=Level+5">
-            <div class="lock-icon">🔒</div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.caption("🔓 Requer Nível 5")
+def navegar_para(aba):
+    st.session_state['aba_ativa'] = aba
+    st.rerun()
 
 
-# --- NAVEGAÇÃO ---
-# Inicializa estado se não existir
+# --- ESTADO INICIAL ---
 if 'aba_ativa' not in st.session_state: st.session_state['aba_ativa'] = 'explorar'
 if 'char_atual' not in st.session_state: st.session_state['char_atual'] = None
-if 'perfil_visualizar' not in st.session_state: st.session_state[
-    'perfil_visualizar'] = None  # Para ver perfil sem conversar
+if 'perfil_visualizar' not in st.session_state: st.session_state['perfil_visualizar'] = None
 
-# Tabs principais
-tab1, tab2, tab3 = st.tabs(["🔥 Explorar", "💬 Chat", "👤 Eu"])
+# --- BARRA DE NAVEGAÇÃO CUSTOMIZADA (TOPO) ---
+# Isso substitui o st.tabs e permite controle total
+c_nav1, c_nav2, c_nav3 = st.columns(3)
 
-# --- ABA 1: EXPLORAR (FEED + PERFIL DETALHADO) ---
-with tab1:
-    # Lógica de Navegação Interna: Grid ou Perfil Detalhado?
-    personagem_foco = st.session_state['perfil_visualizar']
+# Botão Explorar
+classe_btn1 = "nav-btn-selected" if st.session_state['aba_ativa'] == 'explorar' else "nav-btn-unselected"
+with c_nav1:
+    st.markdown(f'<div class="{classe_btn1}">', unsafe_allow_html=True)
+    if st.button("🔥 Explorar", key="nav_explorar", use_container_width=True):
+        navegar_para('explorar')
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    if personagem_foco:
-        # --- TELA DE DETALHES DO PERSONAGEM ---
-        p = carregar_personagem(f"{personagem_foco}.json")
-        img_url = get_avatar_url(p['arquetipo'], p['nome'])
+# Botão Chat
+classe_btn2 = "nav-btn-selected" if st.session_state['aba_ativa'] == 'chat' else "nav-btn-unselected"
+with c_nav2:
+    st.markdown(f'<div class="{classe_btn2}">', unsafe_allow_html=True)
+    if st.button("💬 Chat", key="nav_chat", use_container_width=True):
+        navegar_para('chat')
+    st.markdown('</div>', unsafe_allow_html=True)
 
-        # Botão Voltar
-        if st.button("⬅️ Voltar para o Feed"):
+# Botão Eu
+classe_btn3 = "nav-btn-selected" if st.session_state['aba_ativa'] == 'eu' else "nav-btn-unselected"
+with c_nav3:
+    st.markdown(f'<div class="{classe_btn3}">', unsafe_allow_html=True)
+    if st.button("👤 Eu", key="nav_eu", use_container_width=True):
+        navegar_para('eu')
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown("---")
+
+# =========================================================
+# LÓGICA DE EXIBIÇÃO DAS TELAS
+# =========================================================
+
+# --- TELA 1: EXPLORAR ---
+if st.session_state['aba_ativa'] == 'explorar':
+
+    # Se estiver vendo um perfil específico
+    if st.session_state['perfil_visualizar']:
+        nome_char = st.session_state['perfil_visualizar']
+        p = carregar_personagem(f"{nome_char}.json")
+        avatar = get_avatar_url(p['arquetipo'], p['nome'])
+
+        if st.button("⬅️ Voltar"):
             st.session_state['perfil_visualizar'] = None
             st.rerun()
 
-        # Header do Perfil
-        col_img, col_dados = st.columns([1, 2])
+        col_img, col_info = st.columns([1, 2])
         with col_img:
-            st.image(img_url, use_container_width=True)
-        with col_dados:
+            st.image(avatar, use_container_width=True)
+        with col_info:
             st.title(p['nome'])
-            st.subheader(p['arquetipo'])
-            st.write(f"📝 *{p.get('objetivo_atual', '...')}.*")
+            st.caption(p['arquetipo'])
+            st.info(f"Objective: {p.get('objetivo_atual', '...')}")
 
-            # Botão de Ação Principal
-            if st.button("💬 Começar Conversa", key="btn_start_chat_profile"):
-                st.session_state['char_atual'] = personagem_foco
+            # AQUI ESTÁ A CORREÇÃO MÁGICA
+            # Ao clicar em Chat, mudamos a aba ativa para 'chat' manualmente
+            if st.button("💬 Iniciar Conversa Agora", key="btn_start_chat_profile"):
+                st.session_state['char_atual'] = nome_char
                 st.session_state['perfil_visualizar'] = None
-                st.rerun()
+                navegar_para('chat')  # <--- FORÇA A IDA PARA O CHAT
 
-        st.markdown("---")
-
-        # Stats e Progresso
-        st.write("❤️ **Nível de Relacionamento**")
-        progresso = random.randint(10, 90)  # Simulação
-        st.progress(progresso)
-        st.caption(f"Nível {int(progresso / 10)} - {progresso}% para o próximo nível")
-
-        # Características (Tags)
-        st.write("🧠 **Personalidade**")
-        tracos = p.get('tracos_personalidade', [])
-        st.markdown(" ".join([f"`#{t.strip()}`" for t in tracos]))
-
-        st.markdown("---")
-
-        # Galeria (Sistema de Monetização Futuro)
-        render_galeria_simulada()
-
-        # Botão Fake de Compra
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("💎 Assinar Premium para ver tudo"):
-            st.toast("Funcionalidade em breve!", icon="🚧")
+        st.markdown("#### 📸 Fotos Privadas")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.image("https://placehold.co/150/2a0845/FFF?text=Open", caption="Pública")
+        with c2:
+            st.image("https://placehold.co/150/000/333?text=Locked", caption="🔒 Premium")
+        with c3:
+            st.image("https://placehold.co/150/000/333?text=Locked", caption="🔒 Nível 10")
 
     else:
-        # --- TELA DE FEED (GRID) ---
-        st.markdown("### ✨ Quem você quer conhecer hoje?")
+        # Feed Principal
+        st.subheader("Quem você quer conhecer?")
         arquivos = listar_personagens()
         cols = st.columns(2)
 
@@ -218,123 +193,108 @@ with tab1:
             avatar = get_avatar_url(p['arquetipo'], p['nome'])
 
             with cols[i % 2]:
-                # Card Visual
+                # Card HTML
                 st.markdown(f"""
                 <div class="char-card">
                     <img src="{avatar}">
                     <div class="char-name">{p['nome']}</div>
-                    <div class="char-desc">{p.get('arquetipo')}</div>
+                    <div class="char-desc">{p['arquetipo']}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Botoes de Ação
-                c_btn1, c_btn2 = st.columns(2)
-                with c_btn1:
-                    # Botão Ver Perfil
-                    if st.button("👤 Perfil", key=f"btn_perfil_{i}"):
+                c_a, c_b = st.columns(2)
+                with c_a:
+                    if st.button("👤 Perfil", key=f"btn_perf_{i}"):
                         st.session_state['perfil_visualizar'] = nome_limpo
                         st.rerun()
-                with c_btn2:
-                    # Botão Conversar (CORRIGIDO)
-                    if st.button("💬 Chat", key=f"btn_chat_{i}"):
+                with c_b:
+                    # BOTÃO CHAT NO FEED
+                    if st.button("💬 Chat", key=f"btn_chat_feed_{i}"):
                         st.session_state['char_atual'] = nome_limpo
-                        st.rerun()
+                        navegar_para('chat')  # <--- FORÇA A MUDANÇA DE TELA
 
-# --- ABA 2: CHAT (CONVERSAS) ---
-with tab2:
+# --- TELA 2: CHAT ---
+elif st.session_state['aba_ativa'] == 'chat':
+
     char_selecionado = st.session_state.get('char_atual')
 
     if not char_selecionado:
-        st.info("👈 Escolha alguém na aba 'Explorar' para conversar.")
-        # Lista rápida de recentes
-        st.markdown("#### 🕒 Continuar Conversa:")
+        st.info("👈 Ninguém selecionado. Vá em 'Explorar' primeiro.")
+        st.markdown("#### Histórico Recente")
+        # Lista de recentes para facilitar
         arquivos = listar_personagens()
         for arquivo in arquivos:
             nome = arquivo.replace(".json", "")
-            if st.button(f"➡️ {nome}", key=f"hist_{nome}"):
+            if st.button(f"➡️ Retomar com {nome}", key=f"retomar_{nome}"):
                 st.session_state['char_atual'] = nome
                 st.rerun()
     else:
-        # --- INTERFACE DO CHAT ---
+        # Chat Ativo
         p_atual = carregar_personagem(f"{char_selecionado}.json")
         msgs = carregar_mensagens_salvas(f"{char_selecionado}.json")
 
-        # Header Compacto
-        c_back, c_tit, c_act = st.columns([1, 4, 1])
-        with c_back:
-            if st.button("❌", help="Fechar conversa"):
+        # Header do Chat
+        c_voltar, c_tit, c_menu = st.columns([1, 4, 1])
+        with c_voltar:
+            if st.button("⬅️"):
                 st.session_state['char_atual'] = None
-                st.rerun()
+                navegar_para('explorar')
         with c_tit:
-            st.markdown(f"**{p_atual['nome']}**")
-        with c_act:
-            if st.button("🗑️", help="Limpar"):
+            st.markdown(f"<h3 style='text-align: center; margin: 0;'>{p_atual['nome']}</h3>", unsafe_allow_html=True)
+            st.markdown(f"<p style='text-align: center; color: gray; margin: 0;'>{p_atual['arquetipo']}</p>",
+                        unsafe_allow_html=True)
+        with c_menu:
+            if st.button("🗑️"):
                 limpar_historico_visual(f"{char_selecionado}.json")
                 st.rerun()
 
         st.markdown("---")
 
-        # Área de Mensagens
-        chat_container = st.container(height=400)
+        # Área de Mensagens (Com Scroll automático pelo container)
+        chat_container = st.container(height=500)
         with chat_container:
+            if not msgs:
+                st.caption(f"Inicie a conversa com {p_atual['nome']}...")
+
             for msg in msgs:
-                css_class = "bubble-user" if msg["role"] == "user" else "bubble-ai"
-                st.markdown(f'<div class="{css_class}">{msg["content"]}</div>', unsafe_allow_html=True)
+                classe = "bubble-user" if msg["role"] == "user" else "bubble-ai"
+                st.markdown(f"<div class='{classe}'>{msg['content']}</div>", unsafe_allow_html=True)
 
-        # Input
+        # Input de Texto
         if prompt := st.chat_input("Digite sua mensagem..."):
-            # Salva User
             salvar_mensagem_no_historico(f"{char_selecionado}.json", "user", prompt)
-            st.rerun()  # Atualiza para mostrar msg do user instantaneamente
+            st.rerun()  # Atualiza rápido para mostrar msg do user
 
-        # Processamento da IA (Se a ultima msg for do user, a IA responde)
+        # Processamento IA (Pós-render)
         if msgs and msgs[-1]["role"] == "user":
-            with st.spinner("Digitando..."):
-                resposta_full = responder_usuario(msgs[-1]["content"], p_atual, f"{char_selecionado}.json")
-
-                # Limpeza simples de tags (opcional)
-                fala_limpa = re.sub(r'\[.*?\]', '', resposta_full).strip()
-                if not fala_limpa: fala_limpa = resposta_full
-
-                salvar_mensagem_no_historico(f"{char_selecionado}.json", "assistant", fala_limpa)
+            with st.spinner(f"{p_atual['nome']} está digitando..."):
+                resp = responder_usuario(msgs[-1]["content"], p_atual, f"{char_selecionado}.json")
+                # Limpa tags para o chat visual
+                texto_limpo = re.sub(r'\[.*?\]', '', resp).strip() or resp
+                salvar_mensagem_no_historico(f"{char_selecionado}.json", "assistant", texto_limpo)
                 st.rerun()
 
-# --- ABA 3: EU (CONFIGURAÇÕES E CRIAÇÃO) ---
-with tab3:
-    st.header("👤 Minha Conta")
+# --- TELA 3: EU (CONFIGS) ---
+elif st.session_state['aba_ativa'] == 'eu':
+    st.header("👤 Meu Perfil")
 
-    # 1. Configurações Gerais (O que tinha sumido)
-    with st.expander("⚙️ Configurações do App", expanded=True):
-        st.toggle("🔔 Notificações (Push)", value=True)
-        st.toggle("🌙 Modo Escuro Forçado", value=True, disabled=True)
-        st.selectbox("Idioma", ["Português (BR)", "English", "Español"])
-        if st.button("⚠️ Apagar Todos os Dados"):
-            st.toast("Função de segurança. Implementar depois.", icon="🔒")
+    with st.expander("⚙️ Configurações"):
+        st.toggle("Notificações", True)
+        st.selectbox("Idioma", ["Português", "English"])
 
-    # 2. Criar Novo Personagem (Ferramenta de Admin/User)
-    with st.expander("🛠️ Criar Nova Persona (IA)"):
-        with st.form("new_char"):
+    with st.expander("🛠️ Criar Personagem"):
+        with st.form("criar_p"):
             nome = st.text_input("Nome")
-            arquetipo = st.text_input("Arquétipo (Ex: Vampira, CEO)")
-            historia = st.text_area("História / Lore")
-
-            c1, c2 = st.columns(2)
-            tracos = c1.text_input("Personalidade (CSV)")
-            estilo = c2.text_input("Estilo de Fala")
-
+            arq = st.text_input("Arquétipo")
+            hist = st.text_area("História")
             if st.form_submit_button("Criar"):
-                criar_personagem_avancado(nome, arquetipo, tracos, "Nenhum", "Interagir", estilo, "Médio", "Nenhum",
-                                          historia)
+                criar_personagem_avancado(nome, arq, "Normal", "Nenhum", "Conversar", "Casual", "Médio", "Nenhum", hist)
                 st.success("Criado!")
                 time.sleep(1)
                 st.rerun()
 
-    # 3. Injetar Conhecimento (RAG)
-    with st.expander("📚 Carregar Livros/Lore (PDF)"):
-        pdf = st.file_uploader("Enviar PDF", type="pdf")
+    with st.expander("📚 Upload de PDF (Mundo)"):
+        pdf = st.file_uploader("Enviar", type="pdf")
         if pdf:
-            msg = processar_conhecimento_mundo(pdf)
-            st.success(msg)
-
-    st.markdown("---")
-    st.caption("Roleplay Verse v1.0 - Alpha")
+            res = processar_conhecimento_mundo(pdf)
+            st.success(res)
