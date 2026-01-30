@@ -5,5 +5,5 @@ copie o código a seguir: streamlit run app.py
 
 # Comando para enviar para o github e atualizar no streamlit cloud
 git add .
-git commit -m "Feature: Adiciona RAG com PDF"
+git commit -m "Feature: Colocar aqui o tipo de alteracao feita"
 git push
