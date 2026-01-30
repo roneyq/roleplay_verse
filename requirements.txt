@@ -1,8 +1,9 @@
 streamlit
 langchain
-langchain_community
+langchain-community
 langchain-groq
 langchain-huggingface
 langchain-chroma
 python-dotenv
 chromadb
+pysqlite3-binary
