@@ -1,9 +1,16 @@
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-
-
 import streamlit as st
+import sys
+import os
+
+# --- Hack do BD (só roda se estiver na nuvem/linux) ---
+try:
+    __import__('pysqlite3')
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except ImportError:
+    # Se der erro (estamos no windows), apenas ignora e segue a vida
+    pass
+
+
 import re
 import time
 # Importando as novas funções de histórico
